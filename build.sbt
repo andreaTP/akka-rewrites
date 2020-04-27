@@ -1,7 +1,7 @@
 import _root_.scalafix.sbt.BuildInfo.{ scala212, scalafixVersion }
 
 inThisBuild(List(
-  organization := "org.scala-lang",
+  organization := "com.sandinh",
   licenses := List("Apache-2.0" -> url("https://www.apache.org/licenses/LICENSE-2.0")),
   developers := List(Developer("", "", "", url("https://github.com/scala/scala-rewrites/graphs/contributors"))),
   homepage := Some(url("https://github.com/scala/scala-rewrites")),
@@ -10,10 +10,22 @@ inThisBuild(List(
 
 skip in publish := true
 
+lazy val publishSettings = Seq(
+  publishTo := sonatypePublishToBundle.value,
+  publishMavenStyle := true,
+  scmInfo := Some(
+    ScmInfo(
+      url("https://github.com/ohze/scala-rewrites"),
+      "scm:git@github.com:ohze/scala-rewrites.git"
+    )
+  )
+)
+
 val rewrites = project.settings(
   moduleName := "scala-rewrites",
   libraryDependencies += "ch.epfl.scala" %% "scalafix-rules" % scalafixVersion,
 )
+  .settings(publishSettings)
 
 val input = project.settings(
   addCompilerPlugin(scalafixSemanticdb),
