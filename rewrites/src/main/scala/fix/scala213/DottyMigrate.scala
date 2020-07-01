@@ -39,6 +39,7 @@ class DottyMigrate(global: LazyValue[ScalafixGlobal])
   def collector(power: DottyPower)(implicit doc: SemanticDocument): PartialFunction[Tree, Patch] = {
     val all = Seq(
       ConstructorProcedureSyntax.collector,
+      ParensAroundLambda.collector,
       new Any2StringAdd().collector,
       new ExplicitNullaryEtaExpansion().collector,
       new ExplicitNonNullaryApply(global).collector(power),
