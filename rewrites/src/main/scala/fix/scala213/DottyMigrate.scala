@@ -38,6 +38,7 @@ class DottyMigrate(global: LazyValue[ScalafixGlobal])
   // that implement CompilerSupport logic for that rule.
   def collector(power: DottyPower)(implicit doc: SemanticDocument): PartialFunction[Tree, Patch] = {
     val all = Seq(
+      ConstructorProcedureSyntax.collector,
       new Any2StringAdd().collector,
       new ExplicitNullaryEtaExpansion().collector,
       new ExplicitNonNullaryApply(global).collector(power),

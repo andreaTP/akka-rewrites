@@ -5,4 +5,5 @@ fix.scala213.ExplicitNullaryEtaExpansion
 fix.scala213.NullaryHashHash
 fix.scala213.ScalaSeq
 fix.scala213.Varargs
+fix.scala213.ConstructorProcedureSyntax
 fix.scala213.DottyMigrate
