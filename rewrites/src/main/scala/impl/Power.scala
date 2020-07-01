@@ -19,7 +19,7 @@ trait IPower extends CompilerSupport {
     case e: Throwable => throw CompilerException(e)
   }
 
-  private def gsymbol(t: Tree): g.Symbol = {
+  protected def gsymbol(t: Tree): g.Symbol = {
     val sSym = t.symbol
     val gSymbols = g.inverseSemanticdbSymbols(sSym.value)
     gSymbols.find(gSym => g.semanticdbSymbol(gSym) == sSym.value).getOrElse(g.NoSymbol)

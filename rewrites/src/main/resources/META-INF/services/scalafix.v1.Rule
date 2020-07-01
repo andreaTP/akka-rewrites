@@ -7,4 +7,5 @@ fix.scala213.ScalaSeq
 fix.scala213.Varargs
 fix.scala213.ConstructorProcedureSyntax
 fix.scala213.ParensAroundLambda
+fix.scala213.NullaryOverride
 fix.scala213.DottyMigrate
