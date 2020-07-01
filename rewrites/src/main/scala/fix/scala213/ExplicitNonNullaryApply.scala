@@ -2,7 +2,6 @@ package fix.scala213
 
 import scala.PartialFunction.{ cond, condOpt }
 import scala.collection.mutable
-import scala.util.control.Exception.nonFatalCatch
 
 import metaconfig.Configured
 
@@ -10,7 +9,6 @@ import scala.meta._
 import scala.meta.internal.pc.ScalafixGlobal
 
 import scalafix.v1._
-import scalafix.internal.rule.CompilerException
 import scalafix.internal.v1.LazyValue
 
 /** Explicitly insert () to non-nullary method applications that lack it.
@@ -18,28 +16,16 @@ import scalafix.internal.v1.LazyValue
  *  https://github.com/scala/scala/pull/8833
  */
 final class ExplicitNonNullaryApply(global: LazyValue[ScalafixGlobal])
-    extends SemanticRule("fix.scala213.ExplicitNonNullaryApply")
+    extends impl.CompilerDependentRule(global, "fix.scala213.ExplicitNonNullaryApply")
 {
   def this() = this(LazyValue.later(() => ScalafixGlobal.newCompiler(Nil, Nil, Map.empty)))
 
-  override def fix(implicit doc: SemanticDocument): Patch = {
-    try unsafeFix() catch {
-      case _: CompilerException =>
-        // Give it another shot (good old "retry.retry")
-        // as the presentation compiler sometimes just dies and succeeds the next time...
-        shutdownAndResetCompiler()
-        try unsafeFix() catch {
-          case _: CompilerException =>
-            // Give up on fixing this file as compiling it crashed the (presentation) compiler twice
-            // but first reset the state of the compiler for the next file
-            shutdownAndResetCompiler()
-            Patch.empty
-        }
-    }
+  protected def unsafeFix()(implicit doc: SemanticDocument) = {
+    lazy val power = new impl.Power(global.value)
+    doc.tree.collect(collector(power)).asPatch
   }
 
-  private def unsafeFix()(implicit doc: SemanticDocument) = {
-    lazy val power = new impl.Power(global.value)
+  def collector(power: => impl.IPower)(implicit doc: SemanticDocument): PartialFunction[Tree, Patch] = {
     val handled = mutable.Set.empty[Term.Name]
 
     def isJavaDefined(name: Term.Name): Boolean = name.value match {
@@ -85,10 +71,10 @@ final class ExplicitNonNullaryApply(global: LazyValue[ScalafixGlobal])
       }
     }.asPatch
 
-    doc.tree.collect {
+    {
       case t @ q"$meth[..$targs](...$args)" => fix(t, meth, targs.isEmpty, args.isEmpty)
       case t @ q"$meth(...$args)"           => fix(t, meth, true,          args.isEmpty)
-    }.asPatch
+    }
   }
 
   // No PostfixSelect in Scalameta, so build one
@@ -114,27 +100,15 @@ final class ExplicitNonNullaryApply(global: LazyValue[ScalafixGlobal])
     if ((compileSv.take(4) != runtimeSv.take(4)) && config.scalacOptions.nonEmpty) {
       Configured.error(
         s"Scala version mismatch: " +
-        s"(1) the target sources were compiled with Scala $compileSv; " +
-        s"(2) Scalafix is running on Scala $runtimeSv. " +
-        s"To fix make scalafixScalaBinaryVersion == ${compileSv.take(4)}. " +
-        "Try `ThisBuild / scalafixScalaBinaryVersion := CrossVersion.binaryScalaVersion(scalaVersion.value)`."
+          s"(1) the target sources were compiled with Scala $compileSv; " +
+          s"(2) Scalafix is running on Scala $runtimeSv. " +
+          s"To fix make scalafixScalaBinaryVersion == ${compileSv.take(4)}. " +
+          "Try `ThisBuild / scalafixScalaBinaryVersion := CrossVersion.binaryScalaVersion(scalaVersion.value)`."
       )
     } else {
       Configured.ok(new ExplicitNonNullaryApply(LazyValue.later { () =>
         ScalafixGlobal.newCompiler(config.scalacClasspath, config.scalacOptions, Map.empty)
       }))
     }
-  }
-
-  override def afterComplete() = shutdownAndResetCompiler()
-
-  def shutdownAndResetCompiler() = {
-    for (g <- global) {
-      nonFatalCatch {
-        g.askShutdown()
-        g.close()
-      }
-    }
-    global.restart() // more of a "reset", as nothing's eagerly started
   }
 }
