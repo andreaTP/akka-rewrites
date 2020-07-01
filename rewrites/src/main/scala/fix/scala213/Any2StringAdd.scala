@@ -20,11 +20,13 @@ object Any2StringAdd {
 final class Any2StringAdd extends SemanticRule("fix.scala213.Any2StringAdd") {
   import Any2StringAdd._
 
+  def collector(implicit doc: SemanticDocument): PartialFunction[Tree, Patch] = {
+    case any2stringaddPlusString(Term.ApplyInfix(lhs, _, _, _)) => wrapStringValueOf(lhs)
+    case primitivePlusString(Term.ApplyInfix(lhs, _, _, _)) => blankStringPlus(lhs)
+  }
+
   override def fix(implicit doc: SemanticDocument): Patch = {
-    doc.tree.collect {
-      case any2stringaddPlusString(Term.ApplyInfix(lhs, _, _, _)) => wrapStringValueOf(lhs)
-      case primitivePlusString(Term.ApplyInfix(lhs, _, _, _)) => blankStringPlus(lhs)
-    }.asPatch
+    doc.tree.collect(collector).asPatch
   }
 
   private def wrapStringValueOf(term: Term) =
