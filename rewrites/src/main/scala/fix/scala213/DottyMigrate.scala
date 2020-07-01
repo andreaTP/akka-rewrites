@@ -42,6 +42,7 @@ class DottyMigrate(global: LazyValue[ScalafixGlobal])
       ParensAroundLambda.collector,
       new Any2StringAdd().collector,
       new ExplicitNullaryEtaExpansion().collector,
+      NullaryOverride.collector(power),
       new ExplicitNonNullaryApply(global).collector(power),
     ).map(_.lift.andThen(_.getOrElse(Patch.empty)))
 
@@ -53,5 +54,5 @@ class DottyMigrate(global: LazyValue[ScalafixGlobal])
 
 object DottyMigrate {
   final class DottyPower(val g: ScalafixGlobal)(implicit val doc: SemanticDocument)
-      extends impl.IPower
+      extends NullaryOverride.IPower with impl.IPower
 }
