@@ -49,3 +49,65 @@ val tests = project.dependsOn(rewrites).enablePlugins(ScalaNightlyPlugin, Scalaf
 )
 
 ScalaNightlyPlugin.bootstrapSettings
+
+val input3 = project.settings(
+  scalacOptions ++= List("-Yrangepos", "-P:semanticdb:synthetics:on"),
+  addCompilerPlugin("org.scalameta" % "semanticdb-scalac" % scalametaVersion cross CrossVersion.patch),
+  scalaVersion := scala213,
+  crossScalaVersions := Seq(scalaVersion.value),
+  Test / javaSource := (input / Test / javaSource).value,
+  Test / sourceGenerators += Def.task {
+    val inDir = (input / Test / scalaSource).value
+    val outDir = (Test / sourceManaged).value
+    val rebase = Path.rebase(inDir, outDir).andThen(_.get)
+
+    // Replace `rule = ..` to `rule = fix.scala213.DottyMigrate` in all .scala files in `inSrcDir`
+    def genSrc(in: File): File = {
+      val out = rebase(in)
+      IO.write(out,
+        IO.read(in).replaceFirst(
+          """rule\s*=\s*fix\.scala213\.\w+""",
+          "rule = fix.scala213.DottyMigrate"))
+      out
+    }
+
+    val files = inDir.globRecursive("*.scala").get
+    files.map(genSrc)
+  }.taskValue
+)
+
+val rewrites213 = rewrites.withId("rewrites213").settings(
+  scalaVersion := scala213,
+  crossScalaVersions := Seq(scalaVersion.value),
+  target := file(s"${target.value.getPath}-2.13"),
+)
+
+val tests3 = project.enablePlugins(ScalafixTestkitPlugin).settings(
+  scalaVersion := scala213,
+  crossScalaVersions := Seq(scalaVersion.value),
+  libraryDependencies += "ch.epfl.scala" % "scalafix-testkit" % scalafixVersion % Test cross CrossVersion.patch,
+  Compile / compile := (Compile / compile).dependsOn(input3 / Test / compile).value,
+  scalafixTestkitInputClasspath          := ( input3 / Test / fullClasspath).value,
+  scalafixTestkitInputSourceDirectories  := ( input3 / Test / sourceDirectories).value,
+  scalafixTestkitOutputSourceDirectories := {
+    val d = (ThisBuild / baseDirectory).value / "output3" / "target" / "src-managed"
+    if (!d.exists()) IO.createDirectory(d)
+    Seq(d)
+  },
+).dependsOn(rewrites213)
+
+// This project is used to verify that output can be compiled with dotty
+val output3 = project.settings(
+  crossScalaVersions := Seq("0.24.0", "0.25.0-RC2"),
+  scalaVersion := crossScalaVersions.value.head,
+  Test / javaSource := (output / Test / javaSource).value,
+  Test / sourceGenerators += Def.task {
+    (tests3 / Test / test).value
+    (target.value / "src-managed").globRecursive("*.scala").get
+  }.taskValue
+)
+
+ThisBuild / scalafixScalaBinaryVersion := "2.13"
+
+lazy val root = project.in(file("."))
+  .aggregate(rewrites, input, output, output213, tests, input3, output3, rewrites213)
