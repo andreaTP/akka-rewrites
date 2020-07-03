@@ -71,8 +71,24 @@ val input3 = project.settings(
       out
     }
 
-    val files = inDir.globRecursive("*.scala").get
-    files.map(genSrc)
+    val pending = Set(
+      "Core", // invalid `?=>` identifier & symbol literal 'foo
+      "Infix", // qual() id[Any] qual()
+      "NullaryEtaExpansionJava", // https://gitter.im/lampepfl/dotty?at=5f03f931a5ab931e4f6cf6c5
+      "Override", // see TODO in fix.scala213.NullaryOverride.collector
+    )
+    def isPending(f: File) = pending.contains(f.base)
+
+    val files = inDir.globRecursive("*.scala").get.filterNot(isPending)
+
+    Tracked.diffOutputs(
+      streams.value.cacheStoreFactory.make("diff"),
+      FileInfo.lastModified
+    )(files.toSet) { diff =>
+      IO.delete(diff.removed map rebase)
+      val initial = diff.modified & diff.checked
+      (initial.map(genSrc) ++ diff.unmodified.map(rebase)).toSeq
+    }
   }.taskValue
 )
 
