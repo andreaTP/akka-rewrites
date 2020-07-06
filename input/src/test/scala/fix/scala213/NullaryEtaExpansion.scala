@@ -28,4 +28,9 @@ class NullaryEtaExpansion {
   lazy val lzy_prop = prop _ // rewrite
   lazy val lzy_meth = meth _ // leave
   lazy val lzy_idty = void _ // leave
+
+  def lzy(f: => Int) = {
+    val k = f _
+    k()
+  }
 }
