@@ -26,4 +26,9 @@ abstract class NullaryOverrideTest {
     def hasNext: Boolean = ???
     def foo: T = ???
   }
+
+  class I3 extends I1[Int] {
+    override def hasNext(/* some comment */
+                        ): Boolean = ???
+  }
 }

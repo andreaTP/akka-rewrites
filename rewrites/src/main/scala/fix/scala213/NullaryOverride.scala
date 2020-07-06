@@ -10,6 +10,8 @@ import NullaryOverride._
 import scalafix.internal.rule.CompilerException
 
 import scala.PartialFunction.cond
+import scala.annotation.tailrec
+import scala.meta.tokens.Token.{LeftParen, RightParen}
 
 class NullaryOverride(global: LazyValue[ScalafixGlobal])
     extends impl.CompilerDependentRule(global, "fix.scala213.NullaryOverride") {
@@ -30,9 +32,17 @@ object NullaryOverride {
   def collector(power: => IPower)(implicit doc: SemanticDocument): PartialFunction[Tree, Patch] = {
     case Defn.Def(_, name, _, Nil, _, _) if power.isNullaryMethod(name).contains(false) =>
       Patch.addRight(name.tokens.last, "()")
+    // TODO when remove `()` from `def foo()` in type T then
+    // all references `t.foo()` must be rewritten to `t.foo` (not just in this `doc`)
+    // Similar, `t.foo _` must be rewritten to `() => t.foo`
     case t @ Defn.Def(_, name, _, List(Nil), _, _) if power.isNullaryMethod(name).contains(true) =>
-      val nameTok = name.tokens.last
-      val parens = t.tokens.dropWhile(_ != nameTok).slice(1, 3) // '(' and ')'
+      val lastNameTok = name.tokens.last
+      val tail = t.tokens.dropWhile(_ != lastNameTok)
+      // '(' and ')' and all trivial token between those parens
+      val parens = tail.slice(
+        tail.indexWhere(_.is[LeftParen]),
+        tail.indexWhere(_.is[RightParen]) + 1,
+      )
       Patch.removeTokens(parens)
   }
 
@@ -40,12 +50,24 @@ object NullaryOverride {
       extends IPower with impl.IPower
 
   trait IPower { this: impl.IPower =>
+    /** Similar to `nextOverriddenSymbol` but loop through ancestors.reverse
+      * @see [[scala.reflect.internal.Symbols.Symbol.nextOverriddenSymbol]] */
+    private def rootOverriddenSymbol(s: g.Symbol): g.Symbol = {
+      import g._, s._
+      @tailrec def loop(bases: List[Symbol]): Symbol = bases match {
+        case Nil          => NoSymbol
+        case base :: rest =>
+          val sym = overriddenSymbol(base)
+          if (sym == NoSymbol) loop(rest) else sym
+      }
+      if (isOverridingSymbol) loop(owner.ancestors.reverse) else NoSymbol
+    }
     def isNullaryMethod(t: Tree): Option[Boolean] = try {
       val meth = gsymbol(t)
       val isJavaDefined = meth.overrideChain.exists(sym => sym.isJavaDefined || sym.owner == g.definitions.AnyClass)
 
       if (isJavaDefined) None
-      else meth.nextOverriddenSymbol match {
+      else rootOverriddenSymbol(meth) match {
         case m: g.MethodSymbol => Some(cond(m.info) {
           case g.NullaryMethodType(_) | g.PolyType(_, _: g.NullaryMethodType)=> true
         })
