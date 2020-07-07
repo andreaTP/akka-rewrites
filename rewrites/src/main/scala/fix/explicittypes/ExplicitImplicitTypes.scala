@@ -2,7 +2,7 @@ package fix.explicittypes
 
 import impl.CompilerDependentRule
 import metaconfig.Configured
-import scalafix.internal.rule.TypePrinter
+import scalafix.internal.rule.{TypePrinter, CompilerTypePrinter, ExplicitResultTypesConfig}
 import scalafix.internal.v1.LazyValue
 import scalafix.patch.Patch
 import scalafix.util.TokenOps
@@ -15,27 +15,46 @@ import scala.meta.internal.pc.ScalafixGlobal
 import ExplicitImplicitTypes._
 
 /** @see [[scalafix.internal.rule.ExplicitResultTypes]] */
-final class ExplicitImplicitTypes(global: LazyValue[ScalafixGlobal]) extends CompilerDependentRule(global, "ExplicitImplicitTypes") {
-  def this() = this(LazyValue.later(() => ScalafixGlobal.newCompiler(Nil, Nil, Map.empty)))
+final class ExplicitImplicitTypes(
+    config: ExplicitResultTypesConfig,
+    global: LazyValue[ScalafixGlobal],
+) extends CompilerDependentRule(global, "ExplicitImplicitTypes") {
+  def this() = this(ExplicitResultTypesConfig.default, LazyValue.later(() => ScalafixGlobal.newCompiler(Nil, Nil, Map.empty)))
 
-  override def withConfiguration(config: Configuration) = {
-    val symbolReplacements =
-      config.conf.dynamic.ExplicitImplicitTypes.symbolReplacements
-        .as[Map[String, String]]
-        .getOrElse(Map.empty)
-
-    Configured.ok(new ExplicitImplicitTypes(LazyValue.later { () =>
-      ScalafixGlobal.newCompiler(config.scalacClasspath, config.scalacOptions, symbolReplacements)
-    }))
+  override def withConfiguration(config: Configuration): Configured[Rule] = {
+    val c = interestedExplicitResultTypesConfig(config)
+    val newGlobal = LazyValue.later { () =>
+      ScalafixGlobal.newCompiler(config.scalacClasspath, config.scalacOptions, c.symbolReplacements)
+    }
+    Configured.ok(new ExplicitImplicitTypes(c, newGlobal))
   }
 
   def unsafeFix()(implicit doc: SemanticDocument): Patch = {
-    val c = collector(new CompilerTypePrinter(global.value))
-    doc.tree.collect(c).asPatch
+    lazy val types = new CompilerTypePrinter(global.value, config)
+    doc.tree.collect(collector(types)).asPatch
   }
 }
 
 object ExplicitImplicitTypes {
+  def interestedExplicitResultTypesConfig(config: Configuration): ExplicitResultTypesConfig = {
+    def symbolReplacements(name: String) =
+      config.conf.dynamic.selectDynamic(name).symbolReplacements
+        .as[Map[String, String]]
+        .getOrElse(Map.empty)
+
+    val replacements = Seq(
+      "ExplicitResultTypes",
+      "ExplicitImplicitTypes",
+      "DottyMigrate"
+    ).map(symbolReplacements).reduce(_ ++ _)
+
+    // `CompilerTypePrinter` only use these two fields of `ExplicitResultTypesConfig`
+    ExplicitResultTypesConfig(
+      rewriteStructuralTypesToNamedSubclass = true,
+      symbolReplacements = replacements
+    )
+  }
+
   def collector(types: => TypePrinter)(implicit doc: SemanticDocument): PartialFunction[Tree, Patch] = {
     case t @ Defn.Val(mods, Pat.Var(name) :: Nil, None, body)
       if isRuleCandidate(t, name, mods, body) =>
