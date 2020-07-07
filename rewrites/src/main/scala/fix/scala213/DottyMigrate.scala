@@ -1,41 +1,37 @@
 package fix.scala213
 
 import metaconfig.Configured
+import scalafix.internal.rule.{CompilerTypePrinter, ExplicitResultTypesConfig}
 import scalafix.internal.v1.LazyValue
 import scalafix.v1._
 
 import scala.meta._
 import scala.meta.internal.pc.ScalafixGlobal
-import DottyMigrate._
 import scalafixinternal._
 import fix.explicittypes._
+import fix.explicittypes.ExplicitImplicitTypes.interestedExplicitResultTypesConfig
+import DottyMigrate._
 
 /** This rule combine & run other rules - see [[collector]] - while:
   * + Traveling the doc.tree one time only (for each doc)
   * + Don't re-run [[scala.meta.internal.proxy.GlobalProxy.typedTreeAt]]
   *   for every rules that need `CompilerSupport` */
-class DottyMigrate(global: LazyValue[ScalafixGlobal])
-    extends impl.CompilerDependentRule(global, "fix.scala213.DottyMigrate") {
-  def this() = this(LazyValue.later(() => ScalafixGlobal.newCompiler(Nil, Nil, Map.empty)))
+class DottyMigrate(
+    config: ExplicitResultTypesConfig,
+    global: LazyValue[ScalafixGlobal]
+) extends impl.CompilerDependentRule(global, "fix.scala213.DottyMigrate") {
+  def this() = this(ExplicitResultTypesConfig.default, LazyValue.later(() => ScalafixGlobal.newCompiler(Nil, Nil, Map.empty)))
 
-  override def withConfiguration(config: Configuration): Configured[DottyMigrate] = {
-    def getSymbolReplacements(configName: String) =
-      config.conf.dynamic.selectDynamic(configName).symbolReplacements
-      .as[Map[String, String]]
-      .getOrElse(Map.empty)
-
-    val symbolReplacements = Seq(
-      "DottyMigrate",
-      "ExplicitImplicitTypes"
-    ).map(getSymbolReplacements).reduce(_ ++ _)
-
-    Configured.ok(new DottyMigrate(LazyValue.later { () =>
-      ScalafixGlobal.newCompiler(config.scalacClasspath, config.scalacOptions, symbolReplacements)
-    }))
+  override def withConfiguration(config: Configuration): Configured[Rule] = {
+    val c = interestedExplicitResultTypesConfig(config)
+    val newGlobal = LazyValue.later { () =>
+      ScalafixGlobal.newCompiler(config.scalacClasspath, config.scalacOptions, c.symbolReplacements)
+    }
+    Configured.ok(new DottyMigrate(c, newGlobal))
   }
 
   protected def unsafeFix()(implicit doc: SemanticDocument): Patch = {
-    val power = new DottyPower(global.value)
+    val power = new DottyPower(global.value, config)
     doc.tree.collect(collector(power)).asPatch
   }
 
@@ -63,6 +59,9 @@ class DottyMigrate(global: LazyValue[ScalafixGlobal])
 }
 
 object DottyMigrate {
-  final class DottyPower(g: ScalafixGlobal)(implicit doc: SemanticDocument)
-      extends CompilerTypePrinter(g) with NullaryOverride.IPower with impl.IPower
+  final class DottyPower(
+      val g: ScalafixGlobal,
+      config: ExplicitResultTypesConfig
+  )(implicit val doc: SemanticDocument)
+    extends CompilerTypePrinter(g, config) with NullaryOverride.IPower with impl.IPower
 }

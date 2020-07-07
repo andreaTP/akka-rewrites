@@ -12,7 +12,10 @@ import scalafix.internal.rule.CompilerException
 final class Power(val g: ScalafixGlobal)(implicit val doc: SemanticDocument)
     extends IPower
 
-trait IPower extends CompilerSupport {
+trait IPower {
+  val g: ScalafixGlobal
+  implicit val doc: SemanticDocument
+
   def isJavaDefined(t: Tree): Boolean = try {
     gsymbol(t).overrideChain.exists(sym => sym.isJavaDefined || sym.owner == g.definitions.AnyClass)
   } catch {
