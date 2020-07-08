@@ -22,6 +22,10 @@ inThisBuild(List(
 val rewrites = project.enablePlugins(ScalaNightlyPlugin).settings(
   moduleName := "scala-rewrites",
   libraryDependencies += "ch.epfl.scala" %% "scalafix-rules" % scalafixVersion,
+  libraryDependencies ++= (
+    if (scalaVersion.value.startsWith("2.13")) Nil
+    else Seq("com.github.bigwheel" %% "util-backports" % "2.1")
+  ),
   publish / skip := false,
 )
 

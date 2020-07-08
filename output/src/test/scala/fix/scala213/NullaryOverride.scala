@@ -28,3 +28,21 @@ abstract class NullaryOverrideTest {
     override def hasNext: Boolean = ???
   }
 }
+
+class Override2 {
+  class Meth { def m2p() = "" }
+  trait Prop { def p2m: String }
+
+  object meth2prop extends Meth {
+    override def m2p() = "" // add `()`
+  }
+  object prop2meth extends Prop {
+    def p2m = "" // remove `()`
+  }
+
+  this.meth2prop.m2p() // keep
+  meth2prop.m2p()        // add `()`
+
+  prop2meth.p2m // remove `()`
+  prop2meth.p2m   // keep
+}
