@@ -1,5 +1,14 @@
+import java.nio.file.Paths
+import java.util.regex.Pattern
+
 import _root_.scalafix.sbt.BuildInfo._
+import _root_.scalafix.internal.sbt.{Arg, LoggingOutputStream, ScalafixInterface}
+import _root_.scalafix.sbt.ScalafixFailed
+import sbt.io.PathFinder
 import sbt.librarymanagement.Configurations.CompilerPlugin
+import sbt.io.ExtensionFilter.ScalaOrJavaSource
+import scala.meta.io.AbsolutePath
+import scala.util.matching.Regex
 
 def scalametaVersion = "4.3.18"
 
@@ -12,12 +21,14 @@ inThisBuild(List(
     case Some("2.13")      => scala213
     case Some("2.12")      => scala212
     case Some("2.12.next") => scala212 // and then overriden by ScalaNightlyPlugin
-    case None              => scala212
+    case None              => scala213 //scala212
     case tsv               => sys.error(s"Unknown TRAVIS_SCALA_VERSION $tsv")
   }),
   crossScalaVersions := Seq(scala212, scala213),
   publish / skip := true,
+  scalafixScalaBinaryVersion := scalaBinaryVersion.value,
 ))
+
 
 val rewrites = project.enablePlugins(ScalaNightlyPlugin).settings(
   moduleName := "scala-rewrites",
@@ -29,9 +40,64 @@ val rewrites = project.enablePlugins(ScalaNightlyPlugin).settings(
   publish / skip := false,
 )
 
-val input = project.enablePlugins(ScalaNightlyPlugin).settings(
+val Migrate = config("Migrate") extend Test
+val scalafixInterface = taskKey[ScalafixInterface]("scalafixInterface")
+
+val input = project.enablePlugins(ScalaNightlyPlugin).configs(Migrate).dependsOn(rewrites % "scalafix").settings(
   scalacOptions ++= List("-Yrangepos", "-P:semanticdb:synthetics:on"),
   libraryDependencies += "org.scalameta" % "semanticdb-scalac" % scalametaVersion % CompilerPlugin cross CrossVersion.patch,
+  inConfig(Migrate)(Defaults.configSettings ++ scalafixConfigSettings(Migrate)),
+  Migrate / scalafixConfig := Some(baseDirectory.value / ".NullaryOverride.conf"),
+  scalafixInterface := {
+    ScalafixInterface
+    .fromToolClasspath("2.13", Nil, scalafixResolvers.value)()
+    .withArgs(
+      Arg.ScalaVersion(scalaVersion.value),
+      Arg.ScalacOptions((Test / scalacOptions).value),
+      Arg.ToolClasspath((rewrites / Compile / fullClasspath).value.map(_.data.asURL), Nil, Nil),
+    )
+  },
+  Migrate / sourceGenerators += Def.taskDyn {
+    if (!scalaVersion.value.startsWith("2.13")) Def.task(Seq.empty[File])
+    else Def.task {
+      val srcDirs = (Test / sourceDirectories).value
+      val outDir = (Migrate / managedSourceDirectories).value.head
+
+      val pending = Set(
+        "Core", // invalid `?=>` identifier & symbol literal 'foo
+        "Infix", // qual() id[Any] qual()
+        "NullaryEtaExpansionJava", // https://gitter.im/lampepfl/dotty?at=5f03f931a5ab931e4f6cf6c5
+      )
+      def notPending(f: File) = !pending.contains(f.base)
+
+//      val files = (Test / sources).value.filter(notPending)
+      val cp = (Test / fullClasspath).value.map(_.data.toPath)
+
+      val pairs = srcDirs.flatMap { d =>
+        PathFinder(d).globRecursive(ScalaOrJavaSource).filter(notPending) pair Path.rebase(d, outDir)
+      }
+      val interface = scalafixInterface.value
+
+      val outSrcs = pairs.map(_._2)
+      if (!outSrcs.forall(_.exists())) {
+        val errors = interface
+          .withArgs(
+            Arg.Rules(Seq("fix.scala213.DottyMigrate")),
+            Arg.Classpath(cp),
+            Arg.Paths(pairs.map(_._1.toPath)),
+            Arg.ParsedArgs(Seq(
+              "--out-from", srcDirs.map(d => Regex.quote(d.getPath)).mkString("|"),
+              "--out-to", outDir.getPath)),
+          ).run()
+
+        if (errors.nonEmpty) throw new ScalafixFailed(errors.toList)
+
+        IO.copy(pairs)
+      }
+//      outDir.globRecursive(ScalaOrJavaSource).get
+      pairs.map(_._2)
+    }
+  }.taskValue,
 )
 
 val output = project
@@ -54,80 +120,14 @@ val tests = project.dependsOn(rewrites).enablePlugins(ScalaNightlyPlugin, Scalaf
 
 ScalaNightlyPlugin.bootstrapSettings
 
-val input3 = project.settings(
-  scalacOptions ++= List("-Yrangepos", "-P:semanticdb:synthetics:on"),
-  addCompilerPlugin("org.scalameta" % "semanticdb-scalac" % scalametaVersion cross CrossVersion.patch),
-  scalaVersion := scala213,
-  crossScalaVersions := Seq(scalaVersion.value),
-  Test / javaSource := (input / Test / javaSource).value,
-  Test / sourceGenerators += Def.task {
-    val inDir = (input / Test / scalaSource).value
-    val outDir = (Test / sourceManaged).value
-    val rebase = Path.rebase(inDir, outDir).andThen(_.get)
-
-    // Replace `rule = ..` to `rule = fix.scala213.DottyMigrate` in all .scala files in `inSrcDir`
-    def genSrc(in: File): File = {
-      val out = rebase(in)
-      IO.write(out,
-        IO.read(in).replaceFirst(
-          """rule\s*=\s*fix\.scala213\.\w+""",
-          "rule = fix.scala213.DottyMigrate"))
-      out
-    }
-
-    val pending = Set(
-      "Core", // invalid `?=>` identifier & symbol literal 'foo
-      "Infix", // qual() id[Any] qual()
-      "NullaryEtaExpansionJava", // https://gitter.im/lampepfl/dotty?at=5f03f931a5ab931e4f6cf6c5
-      "Override", // see TODO in fix.scala213.NullaryOverride.collector
-    )
-    def isPending(f: File) = pending.contains(f.base)
-
-    val files = inDir.globRecursive("*.scala").get.filterNot(isPending)
-
-    Tracked.diffOutputs(
-      streams.value.cacheStoreFactory.make("diff"),
-      FileInfo.lastModified
-    )(files.toSet) { diff =>
-      IO.delete(diff.removed map rebase)
-      val initial = diff.modified & diff.checked
-      (initial.map(genSrc) ++ diff.unmodified.map(rebase)).toSeq
-    }
-  }.taskValue
-)
-
-val rewrites213 = rewrites.withId("rewrites213").settings(
-  scalaVersion := scala213,
-  crossScalaVersions := Seq(scalaVersion.value),
-  target := file(s"${target.value.getPath}-2.13"),
-)
-
-val tests3 = project.enablePlugins(ScalafixTestkitPlugin).settings(
-  scalaVersion := scala213,
-  crossScalaVersions := Seq(scalaVersion.value),
-  libraryDependencies += "ch.epfl.scala" % "scalafix-testkit" % scalafixVersion % Test cross CrossVersion.patch,
-  Compile / compile := (Compile / compile).dependsOn(input3 / Test / compile).value,
-  scalafixTestkitInputClasspath          := ( input3 / Test / fullClasspath).value,
-  scalafixTestkitInputSourceDirectories  := ( input3 / Test / sourceDirectories).value,
-  scalafixTestkitOutputSourceDirectories := {
-    val d = (ThisBuild / baseDirectory).value / "output3" / "target" / "src-managed"
-    if (!d.exists()) IO.createDirectory(d)
-    Seq(d)
-  },
-).dependsOn(rewrites213)
-
 // This project is used to verify that output can be compiled with dotty
 val output3 = project.settings(
   crossScalaVersions := Seq("0.24.0", "0.25.0-RC2"),
   scalaVersion := crossScalaVersions.value.head,
-  Test / javaSource := (output / Test / javaSource).value,
-  Test / sourceGenerators += Def.task {
-    (tests3 / Test / test).value
-    (target.value / "src-managed").globRecursive("*.scala").get
-  }.taskValue
+  Test / sources := (input / Migrate / sources).value,
+//  Test / test := (Test / test).dependsOn((input / Migrate / scalafix).toTask("")).value
+  Test / test := {
+    (input / Migrate / scalafix).toTask("").value
+    (Test / test).value
+  }
 )
-
-ThisBuild / scalafixScalaBinaryVersion := "2.13"
-
-lazy val root = project.in(file("."))
-  .aggregate(rewrites, input, output, output213, tests, input3, output3, rewrites213)
