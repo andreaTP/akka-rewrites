@@ -4,7 +4,7 @@ import sbt.librarymanagement.Configurations.CompilerPlugin
 def scalametaVersion = "4.3.18"
 
 inThisBuild(List(
-  organization := "org.scala-lang",
+  organization := "com.sandinh",
   licenses := List("Apache-2.0" -> url("https://www.apache.org/licenses/LICENSE-2.0")),
   developers := List(Developer("", "", "", url("https://github.com/scala/scala-rewrites/graphs/contributors"))),
   homepage := Some(url("https://github.com/scala/scala-rewrites")),
@@ -12,7 +12,7 @@ inThisBuild(List(
     case Some("2.13")      => scala213
     case Some("2.12")      => scala212
     case Some("2.12.next") => scala212 // and then overriden by ScalaNightlyPlugin
-    case None              => scala212
+    case None              => scala213
     case tsv               => sys.error(s"Unknown TRAVIS_SCALA_VERSION $tsv")
   }),
   crossScalaVersions := Seq(scala212, scala213),
