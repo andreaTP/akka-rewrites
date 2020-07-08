@@ -47,7 +47,7 @@ class DottyMigrate(
       ParensAroundLambda.collector,
       new Any2StringAdd().collector,
       new ExplicitNullaryEtaExpansion().collector,
-      NullaryOverride.collector(power),
+      NullaryOverride.collector(power, NullaryOverrideConfig.default),
       new ExplicitNonNullaryApply(global).collector(power),
       ExplicitImplicitTypes.collector(power),
     ).map(_.lift.andThen(_.getOrElse(Patch.empty)))
