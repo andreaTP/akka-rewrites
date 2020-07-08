@@ -1,8 +1,8 @@
-# Scalafix Rewrites for Scala
+# Scalafix Rewrites to migrate scala 2 -> 3 (dotty)
 
-## How to run the rewrites
+## How to migrate project from scala 2 to dotty?
 
-Add the `sbt-scalafix` sbt plugin, with the SemanticDB compiler plugin enabled ([official docs][1]):
+1. Add the `sbt-scalafix` sbt plugin, with the SemanticDB compiler plugin enabled ([official docs][1]):
 
 ```scala
 // project/plugins.sbt
@@ -19,22 +19,32 @@ inThisBuild(List(
 ))
 ```
 
-Then run the desired rewrite(s) ([official docs][2]), in sbt:
+2. Run `fix.scala213.DottyMigrate` rule ([official docs][2]), in sbt:
 
 ```scala
-> scalafixAll dependency:fix.scala213.ExplicitNonNullaryApply@org.scala-lang:scala-rewrites:0.1.2
+> scalafixAll dependency:fix.scala213.DottyMigrate@com.sandinh:scala-rewrites:0.1.2-sd
 ```
 
 You can also add the following to your `build.sbt`:
 
 ```scala
-ThisBuild / scalafixDependencies += "org.scala-lang" %% "scala-rewrites" % "0.1.2"
+ThisBuild / scalafixDependencies += "com.sandinh" %% "scala-rewrites" % "0.1.2-sd"
 ```
 
 and then:
 
 ```scala
-> scalafixAll fix.scala213.ExplicitNonNullaryApply
+> scalafixAll fix.scala213.DottyMigrate
+```
+
+3. Run fix.scala213.NullaryOverride rule
+
+echo 'rules = [ fix.scala213.NullaryOverride ]' > .NullaryOverride.conf
+echo 'NullaryOverride.mode = Rewrite' >> .NullaryOverride.conf
+
+```scala
+> set scalafixConfig := Some(file(".NullaryOverride.conf"))
+> scalafixAll
 ```
 
 [1]: https://scalacenter.github.io/scalafix/docs/users/installation.html
