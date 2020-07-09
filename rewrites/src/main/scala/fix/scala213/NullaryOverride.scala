@@ -48,11 +48,27 @@ object NullaryOverride {
   )(implicit doc: SemanticDocument): PartialFunction[Tree, Patch] = config.mode match {
     case ResetAndCollect | CollectAppend => {
       case Defn.Def(_, name, _, Nil, _, _) if power.isNullaryMethod(name).contains(false) =>
-        config.nonNullarySymbols += name.symbol.value
-        Patch.empty
-      case Defn.Def(_, name, _, List(Nil), _, _) if power.isNullaryMethod(name).contains(true) =>
-        config.nullarySymbols += name.symbol.value
-        Patch.empty
+        // if this is a local symbol
+        // eg, the nullary `def postStop` in `new Actor` in fix.scala213.nullaryOverride.Local test case
+        // then we can't save the symbol and rewrite later (when NullaryOverrideConfig.mode == Rewrite)
+        //   because the symbol's value is just `local1`,..
+        // So we rewrite now.
+        // note: This is not a perfect solution -
+        // for a better one, we can rewrite by introducing a new named class similar to
+        // scalafix.internal.rule.ExplicitResultTypesConfig.rewriteStructuralTypesToNamedSubclass
+        if (name.symbol.isLocal) {
+          Patch.addRight(name, "()")
+        } else {
+          config.nonNullarySymbols += name.symbol.value
+          Patch.empty
+        }
+      case t @ Defn.Def(_, name, _, List(Nil), _, _) if power.isNullaryMethod(name).contains(true) =>
+        if (name.symbol.isLocal) {
+          removeParens(t, name)
+        } else {
+          config.nullarySymbols += name.symbol.value
+          Patch.empty
+        }
     }
     case Rewrite => {
       case config.nonNullaryMatcher(name: Term.Name)
