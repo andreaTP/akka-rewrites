@@ -3,7 +3,6 @@ package fix.scala213
 import java.io.FileWriter
 import java.nio.file.{Path, Paths}
 
-import scala.PartialFunction.cond
 import scala.annotation.tailrec
 import scala.util.Using
 
@@ -107,15 +106,20 @@ object NullaryOverride {
       }
       if (isOverridingSymbol) loop(owner.ancestors.reverse) else NoSymbol
     }
+    @tailrec private def isNullary(t: g.Type): Boolean = t match {
+      case g.NullaryMethodType(_) => true
+      case m: g.MethodType => m.isImplicit
+      case g.PolyType(_, r) => isNullary(r)
+      case _ => false
+    }
+
     def isNullaryMethod(t: Tree): Option[Boolean] = try {
       val meth = gsymbol(t)
       val isJavaDefined = meth.overrideChain.exists(sym => sym.isJavaDefined || sym.owner == g.definitions.AnyClass)
 
       if (isJavaDefined) None
       else rootOverriddenSymbol(meth) match {
-        case m: g.MethodSymbol => Some(cond(m.info) {
-          case g.NullaryMethodType(_) | g.PolyType(_, _: g.NullaryMethodType)=> true
-        })
+        case m: g.MethodSymbol => Some(isNullary(m.info))
         case _ => None
       }
     } catch {
