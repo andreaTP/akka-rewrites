@@ -4,6 +4,7 @@ rule = fix.scala213.NullaryOverride
 package fix.scala213
 
 import scala.annotation.unchecked.uncheckedVariance
+import scala.reflect.ClassTag
 
 trait ActorRef[-T] {
   def unsafeUpcast[U >: T @uncheckedVariance]: ActorRef[U]
@@ -49,4 +50,14 @@ class Override2 {
 
   prop2meth.p2m() // remove `()`
   prop2meth.p2m   // keep
+}
+
+object NullaryOverrideAkka {
+  trait CommandResult[Command, Event, State] {
+    def eventOfType[E <: Event : ClassTag]: E
+  }
+  class CommandResultImpl[Command, Event, State, Reply] extends CommandResult[Command, Event, State] {
+    // must not add `()`
+    override def eventOfType[E <: Event: ClassTag]: E = ???
+  }
 }
