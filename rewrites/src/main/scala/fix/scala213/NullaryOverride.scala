@@ -1,6 +1,6 @@
 package fix.scala213
 
-import java.io.{File, FileWriter}
+import java.io.FileWriter
 import java.nio.file.{Path, Paths}
 
 import scala.PartialFunction.cond
@@ -138,29 +138,16 @@ case class NullaryOverrideConfig(
 ) {
   val nullarySymbols: mutable.Set[String] = mutable.Set.empty
   val nonNullarySymbols: mutable.Set[String] = mutable.Set.empty
-  lazy val nullaryMatcher: SymbolMatcher = matcher(nullarySymFile)
-  lazy val nonNullaryMatcher: SymbolMatcher = matcher(nonNullarySymFile)
-
-  val nullarySymFile: File = nullarySymPath.toFile
-  val nonNullarySymFile: File = nonNullarySymPath.toFile
+  lazy val nullaryMatcher: SymbolMatcher = matcher(nullarySymPath)
+  lazy val nonNullaryMatcher: SymbolMatcher = matcher(nonNullarySymPath)
 
   def saveCollected(): Unit = mode match {
     case ResetAndCollect =>
-      Using(new FileWriter(nullarySymFile))(writeSymbols(nullarySymbols, _))
-      Using(new FileWriter(nonNullarySymFile))(writeSymbols(nonNullarySymbols, _))
+      writeSymbols(nullarySymbols, nullarySymPath)
+      writeSymbols(nonNullarySymbols, nonNullarySymPath)
     case CollectAppend =>
-      Using.resources(
-        Source.fromFile(nullarySymFile),
-        new FileWriter(nullarySymFile)
-      ) { (src, fw) =>
-        writeSymbols(src.getLines().toSet ++ nullarySymbols, fw)
-      }
-      Using.resources(
-        Source.fromFile(nonNullarySymFile),
-        new FileWriter(nonNullarySymFile)
-      ){ (src, fw) =>
-        writeSymbols(src.getLines().toSet ++ nonNullarySymbols, fw)
-      }
+      appendSymbols(nullarySymbols, nullarySymPath)
+      appendSymbols(nonNullarySymbols, nonNullarySymPath)
     case Rewrite => // do nothing
   }
 }
@@ -170,15 +157,15 @@ object NullaryOverrideConfig {
   implicit val reader: ConfDecoder[NullaryOverrideConfig] = generic.deriveDecoder[NullaryOverrideConfig](default)
   implicit val surface: Surface[NullaryOverrideConfig] = generic.deriveSurface[NullaryOverrideConfig]
 
-  private def matcher(f: File) = SymbolMatcher.exact(
-    Using(Source.fromFile(f))(_.getLines.toList).get: _*
-  )
-
-  private def writeSymbols(symbols: Iterable[String], fw: FileWriter): Unit =
-    symbols.foreach { sym =>
-      fw.write(sym)
-      fw.write('\n')
+  private def readLines(p: Path) = Using(Source.fromFile(p.toFile))(_.getLines.toList).get
+  private def writeSymbols(symbols: Iterable[String], p: Path): Unit =
+    Using(new FileWriter(p.toFile)) { fw =>
+      symbols.foreach { sym => fw.write(s"$sym\n") }
     }
+  private def appendSymbols(symbols: Iterable[String], p: Path): Unit =
+    writeSymbols(readLines(p).toSet ++ symbols, p)
+
+  private def matcher(p: Path) = SymbolMatcher.exact(readLines(p): _*)
 }
 
 sealed trait NullaryOverrideMode
