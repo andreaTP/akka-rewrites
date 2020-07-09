@@ -17,21 +17,24 @@ import DottyMigrate._
   * + Don't re-run [[scala.meta.internal.proxy.GlobalProxy.typedTreeAt]]
   *   for every rules that need `CompilerSupport` */
 class DottyMigrate(
-    config: ExplicitResultTypesConfig,
+    config: DottyMigrateConfig,
     global: LazyValue[ScalafixGlobal]
 ) extends impl.CompilerDependentRule(global, "fix.scala213.DottyMigrate") {
-  def this() = this(ExplicitResultTypesConfig.default, LazyValue.later(() => ScalafixGlobal.newCompiler(Nil, Nil, Map.empty)))
+  def this() = this(DottyMigrateConfig.default, LazyValue.later(() => ScalafixGlobal.newCompiler(Nil, Nil, Map.empty)))
 
   override def withConfiguration(config: Configuration): Configured[Rule] = {
-    val c = interestedExplicitResultTypesConfig(config)
+    val c = DottyMigrateConfig(
+      interestedExplicitResultTypesConfig(config),
+      config.conf.get[NullaryOverrideConfig]("NullaryOverride").getOrElse(this.config.nullaryOverride)
+    )
     val newGlobal = LazyValue.later { () =>
-      ScalafixGlobal.newCompiler(config.scalacClasspath, config.scalacOptions, c.symbolReplacements)
+      ScalafixGlobal.newCompiler(config.scalacClasspath, config.scalacOptions, c.resTypes.symbolReplacements)
     }
     Configured.ok(new DottyMigrate(c, newGlobal))
   }
 
   protected def unsafeFix()(implicit doc: SemanticDocument): Patch = {
-    val power = new DottyPower(global.value, config)
+    val power = new DottyPower(global.value, config.resTypes)
     doc.tree.collect(collector(power)).asPatch
   }
 
@@ -47,7 +50,7 @@ class DottyMigrate(
       ParensAroundLambda.collector,
       new Any2StringAdd().collector,
       new ExplicitNullaryEtaExpansion().collector,
-      NullaryOverride.collector(power, NullaryOverrideConfig.default),
+      NullaryOverride.collector(power, config.nullaryOverride),
       new ExplicitNonNullaryApply(global).collector(power),
       ExplicitImplicitTypes.collector(power),
     ).map(_.lift.andThen(_.getOrElse(Patch.empty)))
@@ -55,6 +58,11 @@ class DottyMigrate(
     {
       case t => all.foldLeft(Patch.empty)(_ + _(t))
     }
+  }
+
+  override def afterComplete(): Unit = {
+    config.nullaryOverride.saveCollected()
+    super.afterComplete()
   }
 }
 
@@ -64,4 +72,12 @@ object DottyMigrate {
       config: ExplicitResultTypesConfig
   )(implicit val doc: SemanticDocument)
     extends CompilerTypePrinter(g, config) with NullaryOverride.IPower with impl.IPower
+}
+
+case class DottyMigrateConfig(
+    resTypes: ExplicitResultTypesConfig = ExplicitResultTypesConfig.default,
+    nullaryOverride: NullaryOverrideConfig = NullaryOverrideConfig.default
+)
+object DottyMigrateConfig {
+  val default = DottyMigrateConfig()
 }
