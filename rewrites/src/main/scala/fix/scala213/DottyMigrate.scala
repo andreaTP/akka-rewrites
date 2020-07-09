@@ -71,7 +71,7 @@ object DottyMigrate {
       val g: ScalafixGlobal,
       config: ExplicitResultTypesConfig
   )(implicit val doc: SemanticDocument)
-    extends CompilerTypePrinter(g, config) with NullaryOverride.IPower with impl.IPower
+    extends CompilerTypePrinter(g, config) with impl.NullaryPower with impl.IPower
 }
 
 case class DottyMigrateConfig(
