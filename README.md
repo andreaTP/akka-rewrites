@@ -20,15 +20,15 @@ inThisBuild(List(
 ```
 
 2. Run `fix.scala213.DottyMigrate` rule ([official docs][2]), in sbt:
-
+_Replace `<version>` with an actual value, eg `0.1.4-sd`. See [releases](https://github.com/ohze/scala-rewrites/releases)_
 ```scala
-> scalafixAll dependency:fix.scala213.DottyMigrate@com.sandinh:scala-rewrites:0.1.3-sd
+> scalafixAll dependency:fix.scala213.DottyMigrate@com.sandinh:scala-rewrites:<version>
 ```
 
 You can also add the following to your `build.sbt`:
 
 ```scala
-ThisBuild / scalafixDependencies += "com.sandinh" %% "scala-rewrites" % "0.1.3-sd"
+ThisBuild / scalafixDependencies += "com.sandinh" %% "scala-rewrites" % "<version>"
 ```
 
 and then:
