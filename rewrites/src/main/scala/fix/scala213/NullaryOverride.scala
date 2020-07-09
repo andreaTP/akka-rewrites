@@ -157,11 +157,12 @@ object NullaryOverrideConfig {
   implicit val reader: ConfDecoder[NullaryOverrideConfig] = generic.deriveDecoder[NullaryOverrideConfig](default)
   implicit val surface: Surface[NullaryOverrideConfig] = generic.deriveSurface[NullaryOverrideConfig]
 
-  private def readLines(p: Path) = Using(Source.fromFile(p.toFile))(_.getLines.toList).get
+  private def readLines(p: Path): List[String] =
+    Using(Source.fromFile(p.toFile))(_.getLines.toList).getOrElse(Nil)
   private def writeSymbols(symbols: Iterable[String], p: Path): Unit =
     Using(new FileWriter(p.toFile)) { fw =>
       symbols.foreach { sym => fw.write(s"$sym\n") }
-    }
+    }.get
   private def appendSymbols(symbols: Iterable[String], p: Path): Unit =
     writeSymbols(readLines(p).toSet ++ symbols, p)
 
