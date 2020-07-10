@@ -53,6 +53,7 @@ class DottyMigrate(
       NullaryOverride.collector(power, config.nullaryOverride),
       new ExplicitNonNullaryApply(global).collector(power),
       ExplicitImplicitTypes.collector(power),
+      MultiArgInfix.collector,
     ).map(_.lift.andThen(_.getOrElse(Patch.empty)))
 
     {

@@ -10,3 +10,4 @@ fix.scala213.ParensAroundLambda
 fix.scala213.NullaryOverride
 fix.scala213.DottyMigrate
 fix.explicittypes.ExplicitImplicitTypes
+fix.scala213.MultiArgInfix
