@@ -11,3 +11,4 @@ fix.scala213.NullaryOverride
 fix.scala213.DottyMigrate
 fix.explicittypes.ExplicitImplicitTypes
 fix.scala213.MultiArgInfix
+fix.scala213.FinalObject
