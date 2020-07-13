@@ -2,3 +2,4 @@ target
 target-2.13
 /.nonNullary.NullaryOverride
 /.nullary.NullaryOverride
+/.idea/
