@@ -43,7 +43,7 @@ trait A {
   def i: Int
   def u(): Unit
 }
-trait B {
+trait B extends A {
   def i() = 1 // fix by remove `()`: def i = 1
   def u = println("hi") // fix by add `()`: def u() = println("hi")
 }
