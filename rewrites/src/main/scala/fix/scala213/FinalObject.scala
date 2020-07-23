@@ -5,7 +5,7 @@ import scalafix.v1._
 import scala.meta._
 import scala.meta.tokens.Token._
 
-class FinalObject extends SyntacticRule("FinalObject") {
+class FinalObject extends SyntacticRule("fix.scala213.FinalObject") {
   override def description: String = "remove redundant `final` modifier for objects"
 
   override def fix(implicit doc: SyntacticDocument): Patch = {
