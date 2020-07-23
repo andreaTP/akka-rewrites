@@ -127,7 +127,7 @@ val output3 = project.settings(
   }.taskValue
 )
 
-ThisBuild / scalafixScalaBinaryVersion := "2.13"
+ThisBuild / scalafixScalaBinaryVersion := scalaBinaryVersion.value
 
 lazy val root = project.in(file("."))
   .aggregate(rewrites, input, output, output213, tests, input3, output3, rewrites213)
