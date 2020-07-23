@@ -80,6 +80,7 @@ val input3 = project.settings(
       "Infix", // qual() id[Any] qual()
       "NullaryEtaExpansionJava", // https://gitter.im/lampepfl/dotty?at=5f03f931a5ab931e4f6cf6c5
       "Override", // see TODO in fix.scala213.NullaryOverride.collector
+      "NullaryOverride",
     )
     def isPending(f: File) = pending.contains(f.base)
 
