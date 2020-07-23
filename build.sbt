@@ -100,6 +100,7 @@ val rewrites213 = rewrites.withId("rewrites213").settings(
   scalaVersion := scala213,
   crossScalaVersions := Seq(scalaVersion.value),
   target := file(s"${target.value.getPath}-2.13"),
+  publish / skip := true,
 )
 
 val tests3 = project.enablePlugins(ScalafixTestkitPlugin).settings(
