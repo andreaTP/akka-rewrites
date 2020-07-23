@@ -1,5 +1,5 @@
 version: ~> 1.0 # needed for imports
-import: scala/scala-dev:travis/default.yml
+import: ohze/scala-dev:travis/default.yml
 
 language: scala
 env: ADOPTOPENJDK=8
