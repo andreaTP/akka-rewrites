@@ -21,7 +21,7 @@ object MultiArgInfix {
   }
 
   val collector: PartialFunction[Tree, Patch] = {
-    case t @ Term.ApplyInfix(lhs, op, targs, args) if args.sizeIs > 1 =>
+    case t @ Term.ApplyInfix(lhs, op, targs, args) if args.size > 1 =>
       val tokens = t.tokens
       val opTokens = op.tokens
       val toRemoveBetweenOpAndArgs = targs match {
