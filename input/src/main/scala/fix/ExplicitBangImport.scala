@@ -5,12 +5,18 @@ package fix
 
 import akka.actor.Actor
 
-class Something {
+class ExplicitBangImport {
 
   val sender = new Actor()
 
   def foo() = {
     sender ! "hello"
+  }
+
+  def bar() = {
+    if (!true) {
+    } else {
+    }
   }
 
 }
