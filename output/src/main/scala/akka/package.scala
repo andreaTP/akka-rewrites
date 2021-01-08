@@ -1,5 +1,3 @@
-/*
-*/
 package akka
 
 package object actor {

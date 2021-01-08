@@ -21,7 +21,7 @@ lazy val publishSettings = Seq(
   )
 )
 
-val rewrites = project.settings(
+val rewrites = project.in(file("scalafix/rules")).settings(
   moduleName := "scala-rewrites",
   libraryDependencies += "ch.epfl.scala" %% "scalafix-rules" % scalafixVersion,
 )
