@@ -7,4 +7,3 @@ class Actor()
 class ActorRef() {
   def !(s: String) = {}
 }
-

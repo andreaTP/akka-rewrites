@@ -15,7 +15,7 @@ class ExplicitBangImport extends SyntacticRule("fix.ExplicitBangImport") {
   override def fix(implicit doc: SyntacticDocument): Patch = {
     doc.tree
       .collect {
-        case source: Source =>
+        case source: Source if !source.toString().contains("package akka.actor") =>
           val addImport = source.collect {
             case tree: Tree =>
                val alreadyImported = tree.collect {
@@ -38,7 +38,7 @@ class ExplicitBangImport extends SyntacticRule("fix.ExplicitBangImport") {
                     true
                 }
 
-              (hasBang.nonEmpty && containsDefinition.isEmpty)
+              (!alreadyImported.exists(_ == true) && hasBang.nonEmpty && containsDefinition.isEmpty)
           }
 
           if (addImport.exists(_ == true)) {
