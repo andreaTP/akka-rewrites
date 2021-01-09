@@ -49,7 +49,7 @@ class ExplicitBangImport extends SyntacticRule("fix.ExplicitBangImport") {
 
           lazy val patch = source.collect {
             case t@importer"akka.actor.{..$importees}" if importees.size > 1 =>
-              Patch.replaceTree(t, t.toString().replace("}", ",actorRef2Scala}"))
+              Patch.replaceTree(t, s"akka.actor.{ ${importees.mkString(", ")}, actorRef2Scala }")
           }
 
           if (!skipImport && hasBang) {

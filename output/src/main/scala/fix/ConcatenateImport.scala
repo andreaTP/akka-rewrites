@@ -1,6 +1,6 @@
 package fix
 
-import akka.actor.{ Actor, Some ,actorRef2Scala}
+import akka.actor.{ Actor, Some, actorRef2Scala }
 
 class ConcatenateImport {
 
