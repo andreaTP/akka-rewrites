@@ -53,8 +53,9 @@ class ExplicitBangImport extends SyntacticRule("fix.ExplicitBangImport") {
           }
 
           if (!skipImport && hasBang) {
-            patch.headOption.getOrElse {
-              Patch.addGlobalImport(importer"akka.actor.actorRef2Scala")
+            patch match {
+              case p :: Nil => p
+              case _ => Patch.addGlobalImport(importer"akka.actor.actorRef2Scala")
             }
           } else {
             Patch.empty
