@@ -8,6 +8,7 @@ class ExplicitBangImport extends SyntacticRule("fix.ExplicitBangImport") {
 
   def findImportee(importees: List[scala.meta.Importee]): Boolean = {
     importees.exists { _ match {
+      case importee"_" => true
       case importee"actorRef2Scala" => true
       case x => false
     }}
