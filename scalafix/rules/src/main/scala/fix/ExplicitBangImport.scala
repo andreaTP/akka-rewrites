@@ -27,8 +27,6 @@ class ExplicitBangImport extends SyntacticRule("fix.ExplicitBangImport") {
               lazy val hasBang =
                 tree.collect {
                   case x @ Term.ApplyInfix(_, Term.Name("!"), _, _) =>
-                    println(x)
-                    println(x.getClass)
                     true
                 }
 
